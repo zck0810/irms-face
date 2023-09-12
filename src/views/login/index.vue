@@ -1,26 +1,23 @@
 <template>
   <div class="login-container">
     <el-form ref="loginForm" :model="loginForm" :rules="loginRules" class="login-form" auto-complete="on" label-position="left">
-
       <div class="title-container">
-        <h3 class="title">Login Form</h3>
+        <h3 class="title">地震信息资源管理系统</h3>
       </div>
-
-      <el-form-item prop="username">
+      <el-form-item prop="loginId">
         <span class="svg-container">
           <svg-icon icon-class="user" />
         </span>
         <el-input
-          ref="username"
-          v-model="loginForm.username"
-          placeholder="Username"
-          name="username"
+          ref="loginId"
+          v-model="loginForm.loginId"
+          placeholder="loginId"
+          name="loginId"
           type="text"
           tabindex="1"
           auto-complete="on"
         />
       </el-form-item>
-
       <el-form-item prop="password">
         <span class="svg-container">
           <svg-icon icon-class="password" />
@@ -40,45 +37,64 @@
           <svg-icon :icon-class="passwordType === 'password' ? 'eye' : 'eye-open'" />
         </span>
       </el-form-item>
-
-      <el-button :loading="loading" type="primary" style="width:100%;margin-bottom:30px;" @click.native.prevent="handleLogin">Login</el-button>
-
-      <div class="tips">
-        <span style="margin-right:20px;">username: admin</span>
-        <span> password: any</span>
-      </div>
-
+      <el-row>
+        <el-col :span='17'>
+          <el-form-item prop='code'>
+            <el-input
+              id='loginVerifyCode'
+              v-model='reCode'
+              type='text'
+              placeholder='请输入验证码'
+              @keyup.enter.native='checkVerificationCode'
+            />
+          </el-form-item>
+        </el-col>
+        <el-col :span='7'>
+          <el-image
+            :src='base64'
+            :lazy='true'
+            @click.native.prevent='updateVerifyCode'
+          />
+        </el-col>
+      </el-row>
+      <el-button :loading="loading" type="primary" style="width:100%;margin-bottom:30px;" @click.native.prevent="checkVerificationCode">登 录</el-button>
     </el-form>
   </div>
 </template>
 
 <script>
 import { validUsername } from '@/utils/validate'
+import { initVerifyCode } from '@/api/user'
+import { Message } from 'element-ui'
 
 export default {
   name: 'Login',
   data() {
     const validateUsername = (rule, value, callback) => {
       if (!validUsername(value)) {
-        callback(new Error('Please enter the correct user name'))
+        callback(new Error('请输入正确的用户名'))
       } else {
         callback()
       }
     }
     const validatePassword = (rule, value, callback) => {
-      if (value.length < 6) {
-        callback(new Error('The password can not be less than 6 digits'))
+      if (value.length < 1) {
+        callback(new Error('密码长度不能小于1位'))
       } else {
         callback()
       }
     }
     return {
       loginForm: {
-        username: 'admin',
-        password: '111111'
+        loginId: '',
+        password: ''
       },
+      reCode:'',
+      tempVerificationCode:'',
+      base64: '',
+      fosV: '',
       loginRules: {
-        username: [{ required: true, trigger: 'blur', validator: validateUsername }],
+        loginId: [{ required: true, trigger: 'blur', validator: validateUsername }],
         password: [{ required: true, trigger: 'blur', validator: validatePassword }]
       },
       loading: false,
@@ -86,13 +102,9 @@ export default {
       redirect: undefined
     }
   },
-  watch: {
-    $route: {
-      handler: function(route) {
-        this.redirect = route.query && route.query.redirect
-      },
-      immediate: true
-    }
+  created() {
+    window.updateVerifyCode = this.updateVerifyCode
+    this.updateVerifyCode()
   },
   methods: {
     showPwd() {
@@ -110,9 +122,11 @@ export default {
         if (valid) {
           this.loading = true
           this.$store.dispatch('user/login', this.loginForm).then(() => {
-            this.$router.push({ path: this.redirect || '/' })
+            console.log("步骤3：满足登录条件，把 path:'/' 加到路由")
+            this.$router.push({ path: '/' })
             this.loading = false
-          }).catch(() => {
+          }).catch((err) => {
+            console.error(err)
             this.loading = false
           })
         } else {
@@ -120,6 +134,34 @@ export default {
           return false
         }
       })
+    },
+    getCode(vTime) {
+      return new Promise((resolve, reject) => {
+        initVerifyCode(vTime).then(response => {
+          const { verifyCode } = response
+          this.tempVerificationCode = verifyCode
+          const { data } = response
+          resolve(data)
+        }).catch(error => {
+          reject(error)
+        })
+      })
+    },
+    updateVerifyCode() {
+      const vTime = Math.random()
+      this.getCode(vTime).then((base64) => {
+        this.base64 = base64
+      })
+    },
+    checkVerificationCode(){
+      if(this.reCode === ''){
+        Message.error("验证码不能为空")
+      }else if(this.tempVerificationCode !== this.reCode && this.tempVerificationCode !== this.reCode.toUpperCase()){
+        Message.error("验证码输入错误！")
+        this.updateVerifyCode()
+      }else {
+        this.handleLogin()
+      }
     }
   }
 }
@@ -148,16 +190,16 @@ $cursor: #fff;
 
     input {
       background: transparent;
-      border: 0px;
+      border: 1px;
       -webkit-appearance: none;
-      border-radius: 0px;
+      border-radius: 1px;
       padding: 12px 5px 12px 15px;
       color: $light_gray;
       height: 47px;
       caret-color: $cursor;
 
       &:-webkit-autofill {
-        box-shadow: 0 0 0px 1000px $bg inset !important;
+        box-shadow: 0 0 0 1000px $bg inset !important;
         -webkit-text-fill-color: $cursor !important;
       }
     }
@@ -218,7 +260,7 @@ $light_gray:#eee;
     .title {
       font-size: 26px;
       color: $light_gray;
-      margin: 0px auto 40px auto;
+      margin: 1px auto 40px auto;
       text-align: center;
       font-weight: bold;
     }
